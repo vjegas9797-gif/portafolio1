@@ -40,8 +40,9 @@ async function getBlocksData(blockId: string) {
   }).filter((b: any) => b.type !== "unsupported" && (b.text !== "" || b.type === "hr" || b.type === "video" || b.type === "image"));
 }
 
+const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = 3000;
 
   // Cache data so we don't hit rate limits on every reload
@@ -50,8 +51,9 @@ async function startServer() {
 
   app.get("/api/notion-data", async (req, res) => {
     try {
-      if (notionCache && Date.now() - lastFetch < 10000) { // 10 sec cache
-        return res.json({ status: "success", data: notionCache });
+      // Clear cache on request for now to debug, or if query param present
+      if (req.query.refresh === 'true') {
+        notionCache = null;
       }
 
       const portafolioChildren = await notion.blocks.children.list({ block_id: PAGE_ID });
@@ -76,8 +78,20 @@ async function startServer() {
           for (const proj of projectPages) {
             const projId = proj.id;
             const projTitle = (proj as any).child_page.title;
+            
             const projData = await getBlocksData(projId);
-            result.proyectos.push({ id: projId, title: projTitle, data: projData });
+            
+            const pageMetadata = await notion.pages.retrieve({ page_id: projId }) as any;
+            const coverUrl = pageMetadata.cover?.file?.url || pageMetadata.cover?.external?.url || null;
+
+            console.log(`Proyecto: ${projTitle}, Cover: ${coverUrl ? 'SI' : 'NO'}`);
+
+            result.proyectos.push({ 
+              id: projId, 
+              title: projTitle, 
+              data: projData,
+              cover: coverUrl
+            });
           }
         }
       }
@@ -103,9 +117,13 @@ async function startServer() {
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();
+
+export default app;

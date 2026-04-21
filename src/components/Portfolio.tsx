@@ -23,13 +23,20 @@ export default function Portfolio({ data }: { data?: any[] }) {
   
   const projects = isNotion 
     ? data.map((p, i) => {
-        // Imágenes personalizadas en el orden subido
+        // Buscamos primero la PORTADA de la página (la que configuramos en server.ts)
+        // Si no existe, buscamos la última imagen en los bloques (por si acaso)
+        const notionImages = p.data?.filter((block: any) => block.type === 'image') || [];
+        const lastNotionImage = notionImages.length > 0 ? notionImages[notionImages.length - 1].url : null;
+        
+        const finalImage = p.cover || lastNotionImage;
+
+        // Imágenes personalizadas locales de respaldo
         const customImages = ['/proyecto-1.jpg', '/proyecto-2.jpg', '/proyecto-3.jpg'];
         return {
           id: p.id,
           title: p.title,
           category: 'Destacados',
-          image: customImages[i] || `https://images.unsplash.com/photo-${1500000000000 + i * 1000000}?q=80&w=800&auto=format&fit=crop`,
+          image: finalImage || customImages[i] || `https://images.unsplash.com/photo-${1500000000000 + i * 1000000}?q=80&w=800&auto=format&fit=crop`,
           notionData: p.data
         };
       })
